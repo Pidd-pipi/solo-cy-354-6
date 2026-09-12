@@ -7,6 +7,7 @@ import Orders from '../pages/Orders.vue'
 import BookExchange from '../pages/BookExchange.vue'
 import Graduation from '../pages/Graduation.vue'
 import Profile from '../pages/Profile.vue'
+import AdminReports from '../pages/AdminReports.vue'
 import Login from '../pages/Login.vue'
 import Register from '../pages/Register.vue'
 
@@ -19,6 +20,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/book-exchange', component: BookExchange },
   { path: '/graduation', component: Graduation },
   { path: '/profile', component: Profile, meta: { requiresAuth: true } },
+  { path: '/admin/reports', component: AdminReports, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
 ]

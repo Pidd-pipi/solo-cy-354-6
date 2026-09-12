@@ -11,14 +11,16 @@
           </p>
         </div>
         <div class="order-actions">
-          <el-button v-if="o.status === 'pending' && o.buyer_id === authStore.user?.id" size="small" type="primary" @click="buyerConfirm(o.id)">确认收货</el-button>
-          <el-button v-if="o.status === 'confirmed' && o.seller_id === authStore.user?.id" size="small" type="success" @click="sellerConfirm(o.id)">确认收款</el-button>
-          <el-button v-if="o.status === 'pending'" size="small" type="danger" @click="cancel(o.id)">取消</el-button>
+          <el-button v-if="o.status === 'pending' && o.buyer_id === authStore.user?.id" size="small" type="primary" @click="buyerConfirmFn(o.id)">确认收货</el-button>
+          <el-button v-if="o.status === 'confirmed' && o.seller_id === authStore.user?.id" size="small" type="success" @click="sellerConfirmFn(o.id)">确认收款</el-button>
+          <el-button v-if="o.status === 'pending'" size="small" type="danger" @click="cancelFn(o.id)">取消</el-button>
           <el-button v-if="o.status === 'completed'" size="small" @click="reviewDialog(o)">评价</el-button>
+          <el-button v-if="o.status === 'completed'" size="small" type="danger" plain @click="reportDialogOpen(o)">举报</el-button>
         </div>
       </div>
     </el-card>
     <el-empty v-if="orders.length === 0" description="暂无交易" />
+    <ReportDialog ref="reportDialog" target-type="trade_order" :target-id="reportTargetId" />
     <el-dialog v-model="reviewVisible" title="信誉评价" width="420px">
       <el-form label-width="70px">
         <el-form-item label="评价">
@@ -40,8 +42,10 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import TradeStatusBadge from '../components/common/TradeStatusBadge.vue'
+import ReportDialog from '../components/common/ReportDialog.vue'
 import { useTradeStore } from '../stores/tradeStore'
 import { useAuthStore } from '../stores/authStore'
 import { buyerConfirm, sellerConfirm, cancelTradeOrder } from '../api/tradeOrder'
@@ -50,10 +54,19 @@ import { REVIEW_RATINGS } from '../constants/trade'
 import { formatDateTime } from '../utils/dateFormat'
 import type { TradeOrder } from '../types'
 
-const { orders, fetch } = useTradeStore()
+const tradeStore = useTradeStore()
+const { orders } = storeToRefs(tradeStore)
+const { fetch } = tradeStore
 const authStore = useAuthStore()
 const reviewVisible = ref(false)
 const reviewForm = reactive({ trade_id: 0, rating: 'good', content: '' })
+const reportDialog = ref<InstanceType<typeof ReportDialog> | null>(null)
+const reportTargetId = ref(0)
+
+function reportDialogOpen(o: TradeOrder) {
+  reportTargetId.value = o.id
+  reportDialog.value?.open()
+}
 
 async function buyerConfirmFn(id: number) {
   await buyerConfirm(id)

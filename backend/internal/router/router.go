@@ -41,6 +41,7 @@ func New(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
 	orderRepo := repository.NewTradeOrderRepository(db)
 	reviewRepo := repository.NewReviewRepository(db)
 	exchangeRepo := repository.NewBookExchangeRepository(db)
+	reportRepo := repository.NewReportRepository(db)
 
 	// services
 	userSvc := service.NewUserService(userRepo, cfg.JWTSecret, cfg.JWTExpireHours, logger)
@@ -49,6 +50,7 @@ func New(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
 	orderSvc := service.NewTradeOrderService(orderRepo, productRepo, logger)
 	reviewSvc := service.NewReviewService(reviewRepo, orderRepo, userRepo, logger)
 	exchangeSvc := service.NewBookExchangeService(exchangeRepo, logger)
+	reportSvc := service.NewReportService(reportRepo, productRepo, orderRepo, logger)
 
 	// handlers
 	userH := handler.NewUserHandler(userSvc, logger)
@@ -57,6 +59,7 @@ func New(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
 	orderH := handler.NewTradeOrderHandler(orderSvc, userSvc, logger)
 	reviewH := handler.NewReviewHandler(reviewSvc, userSvc, logger)
 	exchangeH := handler.NewBookExchangeHandler(exchangeSvc, logger)
+	reportH := handler.NewReportHandler(reportSvc, logger)
 
 	auth := middleware.AuthRequired(cfg.JWTSecret, logger)
 	requireAdmin := middleware.RequireRole(logger, constants.UserRoleAdmin)
@@ -71,6 +74,7 @@ func New(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
 		RegisterTradeOrderRoutes(v1, orderH, auth, apiLimiter)
 		RegisterReviewRoutes(v1, reviewH, auth, apiLimiter)
 		RegisterBookExchangeRoutes(v1, exchangeH, auth, apiLimiter)
+		RegisterReportRoutes(v1, reportH, auth, requireAdmin, apiLimiter)
 		// admin-only report handling placeholder route group (kept for RBAC coverage)
 		admin := v1.Group("/admin", auth, requireAdmin)
 		admin.GET("/stats", func(c *gin.Context) { util.OK(c, gin.H{"users": "admin-stats"}) })

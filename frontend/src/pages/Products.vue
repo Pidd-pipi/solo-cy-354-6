@@ -33,7 +33,12 @@
         <el-descriptions-item label="状态">{{ productStatusLabel(current.status) }}</el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ current.description }}</el-descriptions-item>
       </el-descriptions>
+      <template #footer>
+        <el-button type="danger" plain @click="reportCurrent">举报该商品</el-button>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
+    <ReportDialog v-if="current" ref="reportDialog" target-type="product" :target-id="current.id" />
   </div>
 </template>
 
@@ -41,6 +46,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import ProductCard from '../components/common/ProductCard.vue'
+import ReportDialog from '../components/common/ReportDialog.vue'
 import { PRODUCT_CATEGORIES, categoryLabel, productStatusLabel } from '../constants/product'
 import { useProducts } from '../hooks/useProducts'
 import { createTradeOrder } from '../api/tradeOrder'
@@ -55,10 +61,20 @@ const detailVisible = ref(false)
 const current = ref<Product | null>(null)
 const authStore = useAuthStore()
 const router = useRouter()
+const reportDialog = ref<InstanceType<typeof ReportDialog> | null>(null)
 
 function showDetail(p: Product) {
   current.value = p
   detailVisible.value = true
+}
+
+function reportCurrent() {
+  if (!authStore.token) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  reportDialog.value?.open()
 }
 
 async function buy(p: Product) {

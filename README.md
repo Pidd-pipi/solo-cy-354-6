@@ -1,6 +1,6 @@
 # CampusMarket（校园二手交易平台）
 
-一款面向高校学生的校内 C2C 交易平台，覆盖闲置物品发布、价格协商私信、交易达成确认、信誉评分举报、毕业季专场与书籍交换等场景。
+一款面向高校学生的校内 C2C 交易平台，覆盖闲置物品发布、价格协商私信、交易达成确认、信誉评分举报、商品/订单举报与管理员处理、毕业季专场与书籍交换等场景。
 
 ## 快速启动（Docker Compose 一键部署）
 
@@ -78,8 +78,8 @@ cy-354/
 │   ├── cmd/server/          # main.go + seed.go
 │   └── internal/
 │       ├── config/          # 环境变量配置
-│       ├── constants/       # product.go, trade.go, user.go, error_codes.go, log_templates.go, messages.go
-│       ├── model/           # user, product, conversation, message, trade_order, review, book_exchange
+│       ├── constants/       # product.go, trade.go, user.go, report.go, error_codes.go, log_templates.go, messages.go
+│       ├── model/           # user, product, conversation, message, trade_order, review, book_exchange, report
 │       ├── repository/      # GORM 仓库（按实体分文件）
 │       ├── service/         # 业务逻辑（按实体分文件）
 │       ├── handler/         # HTTP 处理器（按实体分文件）
@@ -91,14 +91,14 @@ cy-354/
     ├── Dockerfile
     ├── nginx.conf
     └── src/
-        ├── api/             # user, product, conversation, tradeOrder, review, bookExchange
+        ├── api/             # user, product, conversation, tradeOrder, review, bookExchange, report
         ├── stores/          # authStore, userStore, productStore, tradeStore
-        ├── components/common/# ProductCard, ProductForm, MessageBubble, TradeStatusBadge, ExchangeCard
+        ├── components/common/# ProductCard, ProductForm, MessageBubble, TradeStatusBadge, ExchangeCard, ReportDialog
         ├── hooks/           # useAuth, useProducts, useConversations
-        ├── pages/           # Products, Publish, Messages, Orders, BookExchange, Graduation, Profile, Login, Register
+        ├── pages/           # Products, Publish, Messages, Orders, BookExchange, Graduation, Profile, AdminReports, Login, Register
         ├── router/          # index.ts + guards.ts
         ├── utils/           # request, dateFormat, priceFormatter
-        ├── constants/       # product, trade, user, errorCodes
+        ├── constants/       # product, trade, user, report, errorCodes
         └── types/           # 共享类型
 ```
 
@@ -142,6 +142,8 @@ cy-354/
   - `POST /api/v1/trade-orders`、`GET /api/v1/trade-orders/me`、`POST /api/v1/trade-orders/:id/buyer-confirm|seller-confirm|cancel`
   - `POST /api/v1/reviews`、`GET /api/v1/reviews/me`
   - `GET/POST /api/v1/book-exchanges`、`POST /api/v1/book-exchanges/:id/close`
+  - `POST /api/v1/reports`（发起举报）
+  - `GET /api/v1/admin/reports`、`POST /api/v1/admin/reports/:id/handle`（管理员）
   - `GET /api/v1/admin/stats`（管理员）
 
 ## API 接口清单
@@ -174,6 +176,9 @@ cy-354/
 | GET | `/api/v1/book-exchanges` | 书籍交换列表 | 无 |
 | POST | `/api/v1/book-exchanges` | 发布换书请求（自动匹配） | 登录 |
 | POST | `/api/v1/book-exchanges/:id/close` | 关闭换书请求 | 本人 |
+| POST | `/api/v1/reports` | 发起举报（商品/已完成订单，理由+说明） | 登录 |
+| GET | `/api/v1/admin/reports` | 举报列表（默认待处理，可按状态筛选） | 管理员 |
+| POST | `/api/v1/admin/reports/:id/handle` | 处理举报（驳回/下架商品，记录处理时间与结果） | 管理员 |
 | GET | `/api/v1/admin/stats` | 平台统计占位接口 | 管理员 |
 
 ## 枚举出现位置清单
@@ -239,6 +244,27 @@ cy-354/
 - `backend/internal/util/jwt.go` Claims.Role
 - `backend/internal/util/formatters.go` `RoleText()`
 - `backend/internal/constants/log_templates.go` 登录日志带角色
+
+### ReportStatus（pending/rejected/resolved）
+
+前端 `frontend/src/constants/report.ts`：
+
+- `REPORT_STATUSES` / `REPORT_REASONS` / `REPORT_TARGET_TYPES` / `REPORT_ACTIONS` 常量定义
+- `reportStatusLabel()` / `reportStatusType()` / `reportReasonLabel()` / `reportTargetTypeLabel()` 映射
+- `src/components/common/ReportDialog.vue` 举报表单（商品详情与已完成订单共用）
+- `src/pages/AdminReports.vue` 待处理列表、驳回与下架操作、处理结果展示
+
+后端 `backend/internal/constants/report.go`：
+
+- `ReportStatusPending/Rejected/Resolved` 常量
+- `ReportStatuses` 列表、`IsReportStatus()`
+- `ReportTargetProduct/TradeOrder`、`ReportReason*`、`ReportActionReject/Takedown` 常量
+- `ReportStatusText()` / `ReportTargetTypeText()` / `ReportReasonText()` 文案
+- `backend/internal/model/report.go` Status 字段
+- `backend/internal/service/report_service.go` 举报状态机（同一举报人同一对象仅一条待处理）
+- `backend/internal/util/formatters.go` `ReportStatusText()` 等映射
+- `backend/internal/constants/log_templates.go` 举报日志模板
+- `backend/internal/constants/messages.go` 举报提示文案
 
 ## 质量说明
 
