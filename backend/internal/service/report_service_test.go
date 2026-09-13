@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -13,8 +14,9 @@ import (
 )
 
 type fakeReportRepo struct {
-	reports map[uint]*model.Report
-	nextID  uint
+	reports                map[uint]*model.Report
+	nextID                 uint
+	failCreateWithConflict bool
 }
 
 func newFakeReportRepo() *fakeReportRepo {
@@ -26,6 +28,11 @@ func (f *fakeReportRepo) Transaction(ctx context.Context, fn func(txCtx context.
 }
 
 func (f *fakeReportRepo) Create(_ context.Context, rp *model.Report) error {
+	if f.failCreateWithConflict {
+		// simulates the uniq_reports_pending_key unique index firing when a
+		// concurrent insert wins the race after the pre-check passed
+		return util.ErrConflict
+	}
 	rp.ID = f.nextID
 	f.nextID++
 	f.reports[rp.ID] = rp
@@ -259,6 +266,30 @@ func TestReportServiceHandle(t *testing.T) {
 			t.Fatalf("expected not found error")
 		}
 	})
+}
+
+func TestReportServiceCreateConflictFromRepository(t *testing.T) {
+	// The unique index fires under a concurrent insert after the pre-check
+	// passed; the service must surface a 409 conflict, not a 500.
+	svc, reports, _ := newReportFixture()
+	reports.failCreateWithConflict = true
+	_, err := svc.Create(context.Background(), 1, &dto.CreateReportRequest{
+		TargetType: constants.ReportTargetProduct, TargetID: 1,
+		Reason: constants.ReportReasonFake, Description: "并发冲突",
+	})
+	if err == nil {
+		t.Fatalf("expected conflict error, got nil")
+	}
+	var appErr *util.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected AppError, got %T: %v", err, err)
+	}
+	if appErr.Status != 409 || appErr.Code != constants.CodeConflict {
+		t.Fatalf("expected 409/%d, got %d/%d", constants.CodeConflict, appErr.Status, appErr.Code)
+	}
+	if appErr.Message != constants.MsgReportDuplicate {
+		t.Fatalf("expected duplicate message, got %q", appErr.Message)
+	}
 }
 
 func TestReportServiceList(t *testing.T) {

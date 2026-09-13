@@ -36,7 +36,8 @@ const (
 	LogReportCreateFailed             = "report create failed: reporter=%d target_type=%s target_id=%d error=%v"
 	LogReportRejectSuccess            = "report reject success: report_id=%d handled_by=%d"
 	LogReportTakedownSuccess          = "report takedown success: report_id=%d product_id=%d handled_by=%d"
+	LogReportDedupMigration           = "report pending unique index migration: deduplicated pending reports=%d"
 )
 
 // LogTemplateCount guards the "at least 25 templates" requirement.
-const LogTemplateCount = 35
+const LogTemplateCount = 36

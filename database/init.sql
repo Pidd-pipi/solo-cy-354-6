@@ -106,11 +106,14 @@ CREATE TABLE IF NOT EXISTS reports (
   result VARCHAR(255) DEFAULT '',
   handled_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
   handled_at DATETIME(3) NULL,
+  -- 生成列：仅待处理记录产生唯一键，已处理记录为 NULL 不参与唯一约束
+  pending_key VARCHAR(80) GENERATED ALWAYS AS (IF(status = 'pending', CONCAT(target_type, ':', target_id, ':', reporter_id), NULL)) VIRTUAL,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   INDEX idx_reports_reporter (reporter_id),
   INDEX idx_reports_target (target_type, target_id),
   INDEX idx_reports_product (product_id),
-  INDEX idx_reports_status (status)
+  INDEX idx_reports_status (status),
+  UNIQUE KEY uniq_reports_pending_key (pending_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 种子账号（bcrypt）

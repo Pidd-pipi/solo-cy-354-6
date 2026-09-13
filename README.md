@@ -262,6 +262,8 @@ cy-354/
 - `ReportStatusText()` / `ReportTargetTypeText()` / `ReportReasonText()` 文案
 - `backend/internal/model/report.go` Status 字段
 - `backend/internal/service/report_service.go` 举报状态机（同一举报人同一对象仅一条待处理）
+- `backend/internal/repository/report_repository.go` Create 将唯一索引冲突（MySQL 1062）翻译为 `util.ErrConflict`
+- `backend/internal/repository/migrate.go` + `database/init.sql`：`pending_key` 生成列 + 唯一索引 `uniq_reports_pending_key`，并发下同一举报人同一对象最多一条待处理记录
 - `backend/internal/util/formatters.go` `ReportStatusText()` 等映射
 - `backend/internal/constants/log_templates.go` 举报日志模板
 - `backend/internal/constants/messages.go` 举报提示文案
@@ -269,6 +271,7 @@ cy-354/
 ## 质量说明
 
 - 后端 `go build ./...` 与 `go test ./...` 通过（含 service/util 表驱动单测）。
+- 举报并发去重由数据库唯一索引兜底：`REPORT_IT_DSN` 指向可丢弃测试库后，`go test ./internal/service/ -run 'TestReportServiceConcurrentCreate|TestEnsureReportPendingUniqueIndexIdempotent'` 可运行真实数据库并发回归（16 协程并发仅 1 条成功，其余 409 冲突，已有记录不被覆盖）。
 - 前端 `npm run build` 零错误。
 - 分层依赖单向：handler → service → repository → model；构造器注入；`%w` 错误链 + 哨兵错误；统一响应 `{code,message,data}`。
 - 日志模板集中于 `internal/constants/log_templates.go`（≥25 条），全栈引用，字段变更需联动修改（屎山设计约束）。

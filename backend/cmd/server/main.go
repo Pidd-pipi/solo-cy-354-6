@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,7 +13,9 @@ import (
 	"time"
 
 	"github.com/lp/campus-market/internal/config"
+	"github.com/lp/campus-market/internal/constants"
 	"github.com/lp/campus-market/internal/model"
+	"github.com/lp/campus-market/internal/repository"
 	"github.com/lp/campus-market/internal/router"
 	"github.com/lp/campus-market/internal/util"
 	"gorm.io/driver/mysql"
@@ -44,6 +47,15 @@ func main() {
 	); err != nil {
 		logger.Error("auto migrate failed", slog.String("error", err.Error()))
 		os.Exit(1)
+	}
+
+	deduped, err := repository.EnsureReportPendingUniqueIndex(db)
+	if err != nil {
+		logger.Error("report pending unique index migration failed", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	if deduped > 0 {
+		logger.Warn(fmt.Sprintf(constants.LogReportDedupMigration, deduped))
 	}
 
 	if cfg.SeedingEnabled {

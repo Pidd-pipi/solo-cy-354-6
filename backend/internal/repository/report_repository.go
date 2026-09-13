@@ -2,13 +2,18 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/lp/campus-market/internal/constants"
 	"github.com/lp/campus-market/internal/model"
 	"github.com/lp/campus-market/internal/util"
 	"gorm.io/gorm"
 )
+
+// mysqlDuplicateEntry is the MySQL error number for unique index violations.
+const mysqlDuplicateEntry = 1062
 
 // ReportRepository persists report rows.
 type ReportRepository struct {
@@ -25,9 +30,19 @@ func (r *ReportRepository) Transaction(ctx context.Context, fn func(txCtx contex
 	return Transaction(ctx, r.db, fn)
 }
 
-// Create inserts a new report.
+// Create inserts a new report. The uniq_reports_pending_key unique index
+// guarantees that concurrent inserts cannot create two pending reports for
+// the same reporter and target; a violation is returned as util.ErrConflict.
 func (r *ReportRepository) Create(ctx context.Context, rp *model.Report) error {
-	return db(ctx, r.db).Create(rp).Error
+	err := db(ctx, r.db).Create(rp).Error
+	if err != nil {
+		var mysqlErr *mysqldriver.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntry {
+			return util.ErrConflict
+		}
+		return err
+	}
+	return nil
 }
 
 // FindByID returns a report by id.
